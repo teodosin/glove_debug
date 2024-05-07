@@ -37,11 +37,15 @@ async fn try_connect(mut ctx: TaskContext) {
 
     for adapter in adapter_list.iter() {
         println!("Starting scan on {}...", adapter.adapter_info().await.expect("Failed to get adapter info"));
+        
+        
         adapter
             .start_scan(ScanFilter::default())
             .await
             .expect("Can't scan BLE adapter for connected devices...");
-        time::sleep(Duration::from_secs(10)).await;
+
+
+        time::sleep(Duration::from_secs(20)).await;
         let peripherals = adapter.peripherals().await.expect("Failed to get peripherals");
         if peripherals.is_empty() {
             eprintln!("->>> BLE peripheral devices were not found, sorry. Exiting...");
@@ -78,7 +82,20 @@ async fn try_connect(mut ctx: TaskContext) {
                         service.uuid, service.primary
                     );
                     for characteristic in service.characteristics {
-                        println!("  {:?}", characteristic);
+                        println!("Trying to read {:?}", characteristic);
+                        let read_result = peripheral.read(&characteristic).await;
+                        match read_result {
+                            Ok(data) => {
+                                let string = unsafe { std::str::from_utf8_unchecked(&data)};
+                                println!("Read result: {:?}", string);
+                            }
+                            Err(err) => {
+                                eprintln!("Error reading characteristic: {}", err);
+                            }
+                        }
+                        for descriptor in characteristic.descriptors {
+                            println!("    Descriptor UUID: {}", descriptor);
+                        }
                     }
                 }
                 if is_connected {
