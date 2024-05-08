@@ -1,10 +1,12 @@
 mod asyncs;
 mod ble;
+mod particles;
 
 use asyncs::{TaskContext, TokioTasksPlugin, TokioTasksRuntime};
 use bevy::prelude::*;
 use btleplug::api::{Central, Manager as _, Peripheral, ScanFilter};
 use btleplug::platform::Manager;
+use particles::ParticlePlugin;
 use std::time::Duration;
 use tokio::time;
 
@@ -12,6 +14,9 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(TokioTasksPlugin::default())
+        .add_plugins(ParticlePlugin)
+        
+
         .add_systems(Startup, connect)
         .add_systems(Update, listen)
     .run();
@@ -50,6 +55,9 @@ async fn try_connect(mut ctx: TaskContext) {
         if peripherals.is_empty() {
             eprintln!("->>> BLE peripheral devices were not found, sorry. Exiting...");
         } else {
+
+            let target_name = "Ruka";
+
             // All peripheral devices in range
             for peripheral in peripherals.iter() {
                 let properties = peripheral.properties().await.expect("Failed to get peripheral properties");
@@ -58,6 +66,11 @@ async fn try_connect(mut ctx: TaskContext) {
                     .unwrap()
                     .local_name
                     .unwrap_or(String::from("(peripheral name unknown)"));
+
+                if local_name != target_name {
+                    continue;
+                }
+
                 println!(
                     "Peripheral {:?} is connected: {:?}",
                     local_name, is_connected
