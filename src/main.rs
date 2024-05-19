@@ -16,10 +16,16 @@ fn main() {
         .add_plugins(TokioTasksPlugin::default())
         .add_plugins(ParticlePlugin)
         
+        .insert_resource(RukaInput { latest: 0 })
 
         .add_systems(Startup, connect)
         .add_systems(Update, listen)
     .run();
+}
+
+#[derive(Resource, Deref)]
+struct RukaInput {
+    latest: u16
 }
 
 fn connect(runtime: ResMut<TokioTasksRuntime>, mut commands: Commands) {
@@ -83,10 +89,12 @@ async fn try_connect(mut ctx: TaskContext) {
                     }
                 }
                 let is_connected = peripheral.is_connected().await.expect("Failed to get connection status");
+                
                 println!(
                     "Now connected ({:?}) to peripheral {:?}...",
                     is_connected, &local_name
                 );
+
                 peripheral.discover_services().await.expect("Failed to discover services");
                 println!("Discover peripheral {:?} services...", &local_name);
                 for service in peripheral.services() {
@@ -112,12 +120,17 @@ async fn try_connect(mut ctx: TaskContext) {
                     }
                 }
                 if is_connected {
-                    println!("Disconnecting from peripheral {:?}...", &local_name);
-                    peripheral
-                        .disconnect()
-                        .await
-                        .expect("Error disconnecting from BLE peripheral");
+                    ctx.run_on_main_thread(move |mut main_ctx| {
+                        main_ctx.world.insert_resource(RukaInput { latest: 0 });
+                    });
                 }
+                // if is_connected {
+                //     // println!("Disconnecting from peripheral {:?}...", &local_name);
+                //     // peripheral
+                //     //     .disconnect()
+                //     //     .await
+                //     //     .expect("Error disconnecting from BLE peripheral");
+                // }
             }
         }
     }
