@@ -95,34 +95,43 @@ async fn try_connect(mut ctx: TaskContext) {
                     is_connected, &local_name
                 );
 
-                peripheral.discover_services().await.expect("Failed to discover services");
-                println!("Discover peripheral {:?} services...", &local_name);
-                for service in peripheral.services() {
-                    println!(
-                        "Service UUID {}, primary: {}",
-                        service.uuid, service.primary
-                    );
-                    for characteristic in service.characteristics {
-                        println!("Trying to read {:?}", characteristic);
-                        let read_result = peripheral.read(&characteristic).await;
-                        match read_result {
-                            Ok(data) => {
-                                let string = unsafe { std::str::from_utf8_unchecked(&data)};
-                                println!("Read result: {:?}", string);
+                while is_connected {
+                    if !peripheral.is_connected().await.unwrap() {
+                        println!("Disconnected from peripheral {:?}...", &local_name);
+                        break;
+                    }
+
+                    peripheral.discover_services().await.expect("Failed to discover services");
+                    println!("Discover peripheral {:?} services...", &local_name);
+                    for service in peripheral.services() {
+                        println!(
+                            "Service UUID {}, primary: {}",
+                            service.uuid, service.primary
+                        );
+                        for characteristic in service.characteristics {
+                            println!("Trying to read {:?}", characteristic);
+                            let read_result = peripheral.read(&characteristic).await;
+                            match read_result {
+                                Ok(data) => {
+                                    let string = unsafe { std::str::from_utf8_unchecked(&data)};
+                                    println!("Read result: {:?}", string);
+                                    println!("---------------------------------------");
+                                }
+                                Err(err) => {
+                                    eprintln!("Error reading characteristic: {}", err);
+                                }
                             }
-                            Err(err) => {
-                                eprintln!("Error reading characteristic: {}", err);
+                            for descriptor in characteristic.descriptors {
+                                println!("    Descriptor UUID: {}", descriptor);
                             }
-                        }
-                        for descriptor in characteristic.descriptors {
-                            println!("    Descriptor UUID: {}", descriptor);
                         }
                     }
-                }
-                if is_connected {
-                    ctx.run_on_main_thread(move |mut main_ctx| {
-                        main_ctx.world.insert_resource(RukaInput { latest: 0 });
-                    });
+
+                    // if is_connected {
+                    //     ctx.run_on_main_thread(move |mut main_ctx| {
+                    //         main_ctx.world.insert_resource(RukaInput { latest: 0 });
+                    //     });
+                    // }
                 }
                 // if is_connected {
                 //     // println!("Disconnecting from peripheral {:?}...", &local_name);
