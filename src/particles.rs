@@ -1,5 +1,7 @@
-use bevy::{app::{App, Plugin, Startup}, asset::Assets, core::Name, core_pipeline::{bloom::BloomSettings, core_3d::Camera3dBundle, tonemapping::Tonemapping}, ecs::system::{Commands, ResMut}, math::{Vec2, Vec3, Vec4}, prelude::default, render::{camera::Camera, color::Color}, transform::components::Transform};
+use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core::Name, core_pipeline::{bloom::BloomSettings, core_3d::Camera3dBundle, tonemapping::Tonemapping}, ecs::{query::With, system::{Commands, Query, Res, ResMut}}, gizmos::gizmos::Gizmos, math::{Vec2, Vec3, Vec4}, prelude::default, render::{camera::Camera, color::Color}, transform::components::Transform};
 use bevy_hanabi::{Attribute, ColorOverLifetimeModifier, EffectAsset, ExprWriter, Gradient, HanabiPlugin, LinearDragModifier, OrientMode, OrientModifier, ParticleEffect, ParticleEffectBundle, SetAttributeModifier, SetPositionCircleModifier, ShapeDimension, SizeOverLifetimeModifier, Spawner, TangentAccelModifier};
+
+use crate::RukaInput;
 
 
 pub struct ParticlePlugin;
@@ -9,7 +11,32 @@ impl Plugin for ParticlePlugin {
         app
             .add_plugins(HanabiPlugin)
             .add_systems(Startup, setup)
+            .add_systems(Update, update_fx)
         ;
+    }
+}
+
+fn update_fx(
+    mut fx: ResMut<Assets<EffectAsset>>,
+    mut fxe: Query<&mut Transform, With<ParticleEffect>>,
+    ruka: Res<RukaInput>,
+    mut gizmos: Gizmos,
+){
+    if !ruka.init(){
+        return;
+    }
+    let new = ruka.get_fingers()[0] * 10.0;
+
+    gizmos.circle_2d(Vec2::new(0.0, 0.0), new, Color::RED).segments(64);
+
+    for fct in fx.iter_mut() {
+        let ting = fct.1;
+
+    }
+
+    for mut f in fxe.iter_mut() {
+        println!("Trying to update resource with new value {}", new);
+        f.translation = Vec3::new(new, 0.0, 1.0);
     }
 }
 

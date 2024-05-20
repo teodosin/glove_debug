@@ -16,16 +16,46 @@ fn main() {
         .add_plugins(TokioTasksPlugin::default())
         .add_plugins(ParticlePlugin)
         
-        .insert_resource(RukaInput { latest: 0 })
+        .insert_resource(RukaInput::default())
 
         .add_systems(Startup, connect)
         .add_systems(Update, listen)
     .run();
 }
 
-#[derive(Resource, Deref)]
-struct RukaInput {
-    latest: u16
+#[derive(Resource, Default)]
+pub struct RukaInput {
+    init: bool,
+    fingers: [u16; 5]
+}
+
+impl RukaInput {
+    pub fn init(&self) -> bool {
+        self.init
+    }
+
+    pub fn set_init(&mut self, init: bool) {
+        self.init = init;
+    }
+
+    pub fn get_fingers(&self) -> [f32; 5] {
+        let mut fingers = [0.0; 5];
+        for (i, finger) in self.fingers.iter().enumerate() {
+            fingers[i] = *finger as f32 / 16384.0;
+        }
+        fingers
+    }
+
+    pub fn update_fingers(&mut self, new_fingers: [u16; 5]) {
+        self.fingers = new_fingers;
+    }
+
+    pub fn update_finger(&mut self, finger: usize, value: u16) {
+        if finger > 4 {
+            panic!("Finger index out of bounds");
+        }
+        self.fingers[finger] = value;
+    }
 }
 
 fn connect(runtime: ResMut<TokioTasksRuntime>, mut commands: Commands) {
@@ -98,11 +128,17 @@ async fn try_connect(mut ctx: TaskContext) {
                 println!("Discover peripheral {:?} services...", &local_name);
                 peripheral.discover_services().await.expect("Failed to discover services");
 
+                ctx.run_on_main_thread(move |main_ctx| {
+                    let mut ruka = main_ctx.world.get_resource_mut::<RukaInput>().unwrap();
+                    ruka.set_init(true);
+                }).await;
+
                 while is_connected {
                     // if !peripheral.is_connected().await.unwrap() {
                     //     println!("Disconnected from peripheral {:?}...", &local_name);
                     //     break;
                     // }
+                    let mut value: u16 = 0;
 
                     for service in peripheral.services() {
                         // println!(
@@ -110,9 +146,9 @@ async fn try_connect(mut ctx: TaskContext) {
                         //     service.uuid, service.primary
                         // );
                         for characteristic in service.characteristics {
-                            // if characteristic.uuid.to_string() != "1efca1a0-3360-4fb4-9070-b1e9ef5079a9" {
-                            //     continue;
-                            // }
+                            if characteristic.uuid.to_string() != "00002af9-0000-1000-8000-00805f9b34fb" {
+                                continue;
+                            }
                             
                             // println!("Could find");
                             // for descriptor in &characteristic.descriptors {
@@ -123,10 +159,14 @@ async fn try_connect(mut ctx: TaskContext) {
                             let read_result = peripheral.read(&characteristic).await;
                             match read_result {
                                 Ok(data) => {
-                                    // let value = data;
-                                    let value = unsafe { std::str::from_utf8_unchecked(&data)};
-                                    // let value = u16::from_le_bytes([data[0], data[1]]);
-                                    println!("Read bytes: {:?}", value);
+                                    if data.len() == 2 {
+                                        let high_byte = data[0];
+                                        let low_byte = data[1];
+                            
+                                        // Combine the high and low bytes to get the original 16-bit value
+                                        value = ((high_byte as u16) << 6) | (low_byte as u16);
+                                        println!("Read bytes: {:?}", value);
+                                    }
                                     println!("---------------------------------------");
                                 }
                                 Err(err) => {
@@ -139,11 +179,12 @@ async fn try_connect(mut ctx: TaskContext) {
                     let delay = Duration::from_millis(1000 / 60);
                     // tokio::time::sleep(delay).await;
 
-                    // if is_connected {
-                    //     ctx.run_on_main_thread(move |mut main_ctx| {
-                    //         main_ctx.world.insert_resource(RukaInput { latest: 0 });
-                    //     });
-                    // }
+                    if is_connected {
+                        ctx.run_on_main_thread(move |main_ctx| {
+                            let mut ruka = main_ctx.world.get_resource_mut::<RukaInput>().unwrap();
+                            ruka.update_finger(0, value);
+                        }).await;
+                    }
                 }
                 // if is_connected {
                 //     // println!("Disconnecting from peripheral {:?}...", &local_name);
