@@ -4,7 +4,7 @@ mod particles;
 
 use asyncs::{TaskContext, TokioTasksPlugin, TokioTasksRuntime};
 use bevy::prelude::*;
-use btleplug::api::{Central, Manager as _, Peripheral, ScanFilter};
+use btleplug::api::{Central, Characteristic, Manager as _, Peripheral, ScanFilter};
 use btleplug::platform::Manager;
 use particles::ParticlePlugin;
 use std::time::Duration;
@@ -95,37 +95,49 @@ async fn try_connect(mut ctx: TaskContext) {
                     is_connected, &local_name
                 );
 
-                while is_connected {
-                    if !peripheral.is_connected().await.unwrap() {
-                        println!("Disconnected from peripheral {:?}...", &local_name);
-                        break;
-                    }
+                println!("Discover peripheral {:?} services...", &local_name);
+                peripheral.discover_services().await.expect("Failed to discover services");
 
-                    peripheral.discover_services().await.expect("Failed to discover services");
-                    println!("Discover peripheral {:?} services...", &local_name);
+                while is_connected {
+                    // if !peripheral.is_connected().await.unwrap() {
+                    //     println!("Disconnected from peripheral {:?}...", &local_name);
+                    //     break;
+                    // }
+
                     for service in peripheral.services() {
-                        println!(
-                            "Service UUID {}, primary: {}",
-                            service.uuid, service.primary
-                        );
+                        // println!(
+                        //     "Service UUID {}, primary: {}",
+                        //     service.uuid, service.primary
+                        // );
                         for characteristic in service.characteristics {
-                            println!("Trying to read {:?}", characteristic);
+                            // if characteristic.uuid.to_string() != "1efca1a0-3360-4fb4-9070-b1e9ef5079a9" {
+                            //     continue;
+                            // }
+                            
+                            // println!("Could find");
+                            // for descriptor in &characteristic.descriptors {
+                            //     println!("    Descriptor UUID: {}", descriptor);
+                            // }
+                            
+                            println!("Trying to read {:?}", characteristic.uuid.to_string());
                             let read_result = peripheral.read(&characteristic).await;
                             match read_result {
                                 Ok(data) => {
-                                    let string = unsafe { std::str::from_utf8_unchecked(&data)};
-                                    println!("Read result: {:?}", string);
+                                    // let value = data;
+                                    let value = unsafe { std::str::from_utf8_unchecked(&data)};
+                                    // let value = u16::from_le_bytes([data[0], data[1]]);
+                                    println!("Read bytes: {:?}", value);
                                     println!("---------------------------------------");
                                 }
                                 Err(err) => {
                                     eprintln!("Error reading characteristic: {}", err);
                                 }
                             }
-                            for descriptor in characteristic.descriptors {
-                                println!("    Descriptor UUID: {}", descriptor);
-                            }
                         }
                     }
+
+                    let delay = Duration::from_millis(1000 / 60);
+                    // tokio::time::sleep(delay).await;
 
                     // if is_connected {
                     //     ctx.run_on_main_thread(move |mut main_ctx| {
