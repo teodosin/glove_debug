@@ -176,8 +176,8 @@ async fn try_connect(mut ctx: TaskContext) {
                         }
                     }
 
-                    let delay = Duration::from_millis(1000 / 60);
-                    // tokio::time::sleep(delay).await;
+                    let delay = Duration::from_millis(1000 / 30);
+                    tokio::time::sleep(delay).await;
 
                     if is_connected {
                         ctx.run_on_main_thread(move |main_ctx| {
