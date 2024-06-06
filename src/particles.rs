@@ -1,7 +1,7 @@
 use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core::Name, core_pipeline::{bloom::BloomSettings, core_3d::Camera3dBundle, tonemapping::Tonemapping}, ecs::{query::With, system::{Commands, Query, Res, ResMut}}, gizmos::gizmos::Gizmos, math::{Vec2, Vec3, Vec4}, prelude::default, render::{camera::Camera, color::Color}, transform::components::Transform};
 use bevy_hanabi::{Attribute, ColorOverLifetimeModifier, EffectAsset, ExprWriter, Gradient, HanabiPlugin, LinearDragModifier, OrientMode, OrientModifier, ParticleEffect, ParticleEffectBundle, SetAttributeModifier, SetPositionCircleModifier, ShapeDimension, SizeOverLifetimeModifier, Spawner, TangentAccelModifier};
 
-use crate::RukaInput;
+use crate::ruka::RukaInput;
 
 
 pub struct ParticlePlugin;
@@ -22,10 +22,10 @@ fn update_fx(
     ruka: Res<RukaInput>,
     mut gizmos: Gizmos,
 ){
-    if !ruka.init(){
+    if !ruka.is_init(){
         return;
     }
-    let new = ruka.get_fingers()[0] * 10.0;
+    let new = ruka.get_fingers_float()[0] * 10.0;
 
     gizmos.circle_2d(Vec2::new(0.0, 0.0), new, Color::RED).segments(64);
 

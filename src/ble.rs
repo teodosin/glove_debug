@@ -8,7 +8,7 @@ use std::time::Duration;
 use tokio::time;
 
 use crate::asyncs::{TaskContext, TokioTasksPlugin, TokioTasksRuntime};
-use crate::RukaInput;
+use crate::ruka::RukaInput;
 
 pub struct BLEPlugin;
 
@@ -97,7 +97,8 @@ async fn try_connect(mut ctx: TaskContext) {
                     //     println!("Disconnected from peripheral {:?}...", &local_name);
                     //     break;
                     // }
-                    let mut value: u16 = 0;
+                    let mut flexvalues: [u16; 5] = [0; 5];
+                    let mut imuvalues: [f32; 6] = [0.0; 6];
 
                     for service in peripheral.services() {
                         // println!(
@@ -105,33 +106,52 @@ async fn try_connect(mut ctx: TaskContext) {
                         //     service.uuid, service.primary
                         // );
                         for characteristic in service.characteristics {
-                            if characteristic.uuid.to_string() != "00002af9-0000-1000-8000-00805f9b34fb" {
+                            if characteristic.uuid.to_string() == "00002af9-0000-1000-8000-00805f9b34fb" {
+                                // println!("Trying to read {:?}", characteristic.uuid.to_string());
+                                let read_result = peripheral.read(&characteristic).await;
+                                match read_result {
+                                    Ok(data) => {
+                                        if data.len() == 10 {
+                                            for i in 0..5 {
+                                                let high_byte = data[2*i];
+                                                let low_byte = data[2*i+1];
+    
+                                                flexvalues[i] = ((high_byte as u16) << 8) | (low_byte as u16);
+                                            }
+    
+                                        }
+                                    }
+                                    Err(err) => {
+                                        eprintln!("Error reading characteristic: {}", err);
+                                    }
+                                }
+                                
+                            } else if characteristic.uuid.to_string() == "00002713-0000-1000-8000-00805f9b34fb" {
+                                // println!("Trying to read {:?}", characteristic.uuid.to_string());
+                                let read_result = peripheral.read(&characteristic).await;
+                                match read_result {
+                                    Ok(data) => {
+                                        if data.len() == 12 {
+                                            for i in 0..6 {
+                                                let high_byte = data[i * 2] as i16;
+                                                let low_byte = data[i * 2 + 1] as i16;
+                                                let int_value = (high_byte << 8) | (low_byte & 0xFF );
+                                                let float_value = int_value as f32 / 100.0;
+                                                imuvalues[i] = float_value;
+                                            }
+                                            
+                                        }
+                                    }
+                                    Err(err) => {
+                                        eprintln!("Error reading characteristic: {}", err);
+                                    }
+                                }
+                            } else {
                                 continue;
                             }
+                            println!("Read flex bytes: {:?}", flexvalues);
+                            println!("Read imu bytes: {:?}", imuvalues);
                             
-                            // println!("Could find");
-                            // for descriptor in &characteristic.descriptors {
-                            //     println!("    Descriptor UUID: {}", descriptor);
-                            // }
-                            
-                            println!("Trying to read {:?}", characteristic.uuid.to_string());
-                            let read_result = peripheral.read(&characteristic).await;
-                            match read_result {
-                                Ok(data) => {
-                                    if data.len() == 2 {
-                                        let high_byte = data[0];
-                                        let low_byte = data[1];
-                            
-                                        // Combine the high and low bytes to get the original 16-bit value
-                                        value = ((high_byte as u16) << 6) | (low_byte as u16);
-                                        println!("Read bytes: {:?}", value);
-                                    }
-                                    println!("---------------------------------------");
-                                }
-                                Err(err) => {
-                                    eprintln!("Error reading characteristic: {}", err);
-                                }
-                            }
                         }
                     }
 
@@ -141,7 +161,8 @@ async fn try_connect(mut ctx: TaskContext) {
                     if is_connected {
                         ctx.run_on_main_thread(move |main_ctx| {
                             let mut ruka = main_ctx.world.get_resource_mut::<RukaInput>().unwrap();
-                            ruka.update_finger(0, value);
+                            ruka.update_fingers(flexvalues);
+                            ruka.update_imu(imuvalues);
                         }).await;
                     }
                 }
