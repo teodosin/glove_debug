@@ -7,6 +7,10 @@ edition = "2021"
 
 [dependencies]
 bevy = { version = "0.13.2", features = ["dynamic_linking"] }
+bevy-inspector-egui = "0.24.0"
+bevy_gaussian_splatting = "2.1.0"
+bevy_hanabi = "0.10.0"
+bevy_panorbit_camera = "0.18.2"
 btleplug = "0.11.5"
 dbus = "0.9.7"
 hidapi = "2.6.1"
